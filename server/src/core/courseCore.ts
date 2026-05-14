@@ -56,6 +56,16 @@ const normalizeTimeDisplay = (raw: string): string => {
     return `${hh}:${mm}`;
 };
 
+const pickCourseSchedId = (record: any): string => {
+    return String(
+        record?.courseSchedId ??
+        record?.courseSchedID ??
+        record?.course_sched_id ??
+        record?.id ??
+        ''
+    );
+};
+
 const isValidDateStr = (dateStr: string): boolean => {
     if (!/^\d{8}$/.test(dateStr)) {
         return false;
@@ -220,7 +230,7 @@ export const getCoursesDetail = async (
             availableCourses.push({
                 name: courseName,
                 id: courseId,
-                courseSchedId: String(record?.courseSchedId ?? ''),
+                courseSchedId: pickCourseSchedId(record),
                 date: formattedDate,
                 startTime: normalizeTimeDisplay(String(record?.classBeginTime ?? '')),
                 endTime: normalizeTimeDisplay(String(record?.classEndTime ?? '')),
@@ -286,7 +296,7 @@ export const getCourseByDate = async (
         details.push({
             name: String(record?.courseName ?? '未知课程'),
             id: String(record?.courseId ?? ''),
-            courseSchedId: String(record?.id ?? ''),
+            courseSchedId: pickCourseSchedId(record),
             date: formattedDate,
             startTime: normalizeTimeDisplay(String(record?.classBeginTime ?? '')),
             endTime: normalizeTimeDisplay(String(record?.classEndTime ?? '')),

@@ -22,6 +22,14 @@ export const buildScanSignUrl = (
     return ICLASS_URLS[network].SCAN_SIGN;
 };
 
+export const isSignParameterError = (result: any): boolean => {
+    const status = String(result?.STATUS ?? '');
+    const errCode = String(result?.ERRCODE ?? '');
+    const errMsg = String(result?.ERRMSG ?? '');
+
+    return status === '1' && (errCode === '100' || errMsg.includes('参数错误'));
+};
+
 export const signNow = async (
     client: Got,
     useVpn: boolean,

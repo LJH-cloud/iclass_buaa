@@ -2,8 +2,9 @@ import got, { Got } from 'got';
 import { CookieJar } from 'tough-cookie';
 import { vpnLogin } from './authCore';
 import { CourseDetailItem, CourseItem, getCourseByDate as getCourseByDateCore, getCourses, getCoursesDetail, getCurrentSemester } from './courseCore';
-import { signNow as signNowOnline } from './signCore';
+import { isSignParameterError, signNow as signNowOnline } from './signCore';
 import { fetchUserInfoFromApi } from './userCore';
+import logger from '../utils/logger';
 
 export interface IClassLoginInput {
     studentId: string;
@@ -16,6 +17,7 @@ export class IClassClient {
     public userInfo: any = null;
     public sessionId: string | null = null;
     public serverTimeOffset: number = 0;
+    private studentId: string = '';
 
     constructor(
         private useVpn: boolean = false
@@ -41,6 +43,7 @@ export class IClassClient {
         if (!studentId) {
             throw new Error('studentId 不能为空');
         }
+        this.studentId = studentId;
 
         if (this.useVpn) {
             await vpnLogin(this.client, vpnUsername, vpnPassword);
@@ -57,6 +60,18 @@ export class IClassClient {
         this.userInfo = info.userInfo;
         this.sessionId = info.sessionId;
         this.serverTimeOffset = info.serverTimeOffset;
+    }
+
+    async syncServerTime(): Promise<void> {
+        if (!this.studentId) {
+            throw new Error('缺少 studentId，无法同步服务器时间');
+        }
+
+        await this.fetchUserInfo(this.studentId);
+    }
+
+    getAdjustedTimestamp(): number {
+        return Number(Date.now() + this.serverTimeOffset);
     }
 
     async getCurrentSemester(): Promise<string | null> {
@@ -125,13 +140,28 @@ export class IClassClient {
             throw new Error('缺少 userId 或 sessionId，请先登录并获取用户信息');
         }
 
-        return await signNowOnline(
-            this.client,
-            this.useVpn,
-            String(userId),
-            sessionId,
-            courseSchedId,
-            timestamp
-        );
+        const retryOffsets = this.useVpn ? [0, -3000, -6000, -10000] : [0];
+        let lastResult: any = null;
+
+        for (const retryOffset of retryOffsets) {
+            const adjustedTimestamp = timestamp + retryOffset;
+            const result = await signNowOnline(
+                this.client,
+                this.useVpn,
+                String(userId),
+                sessionId,
+                courseSchedId,
+                adjustedTimestamp
+            );
+
+            lastResult = result;
+            if (!isSignParameterError(result)) {
+                return result;
+            }
+
+            logger.warn(`[sign] iClass 参数错误: courseSchedId=${courseSchedId}, timestamp=${adjustedTimestamp}, retryOffset=${retryOffset}ms`);
+        }
+
+        return lastResult;
     }
 }

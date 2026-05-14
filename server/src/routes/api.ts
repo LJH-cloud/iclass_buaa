@@ -240,7 +240,6 @@ const handleSign = async (req: IncomingMessage, res: ServerResponse, urlObj: URL
 	}
 
 	const courseSchedId = String(body?.courseSchedId ?? '').trim();
-	const timestamp = Number(Date.now() + state.context.client.serverTimeOffset);
 
 	if (!courseSchedId) {
 		sendJson(res, 400, {
@@ -262,6 +261,14 @@ const handleSign = async (req: IncomingMessage, res: ServerResponse, urlObj: URL
 		}
 	}
 
+	try {
+		await state.context.client.syncServerTime();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		logger.warn(`[sign] 同步服务器时间失败，继续使用已有偏移: ${message}`);
+	}
+
+	const timestamp = state.context.client.getAdjustedTimestamp();
 	const result = await signNowForFrontend(state.context.client, courseSchedId, timestamp);
 	sendJson(res, result.ok ? 200 : 400, result);
 };
@@ -278,7 +285,14 @@ const handleSignQr = async (req: IncomingMessage, res: ServerResponse, urlObj: U
 	}
 
 	const courseSchedId = String(body?.courseSchedId ?? '').trim();
-	const timestamp = Number(Date.now() + state.context.client.serverTimeOffset);
+	try {
+		await state.context.client.syncServerTime();
+	} catch (error) {
+		const message = error instanceof Error ? error.message : String(error);
+		logger.warn(`[sign-qr] 同步服务器时间失败，继续使用已有偏移: ${message}`);
+	}
+
+	const timestamp = state.context.client.getAdjustedTimestamp();
 	const result = await generateSignQrForFrontend(state.context.useVpn, courseSchedId, timestamp);
 	sendJson(res, result.ok ? 200 : 400, result);
 };

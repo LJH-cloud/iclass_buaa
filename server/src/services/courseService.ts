@@ -1,6 +1,6 @@
 import type { CourseDetailItem, CourseItem } from '../core/courseCore';
 import { IClassClient } from '../core/IClassClient';
-import { buildScanSignUrl } from '../core/signCore';
+import { buildScanSignUrl, isSignParameterError } from '../core/signCore';
 import logger from '../utils/logger';
 
 export interface ServiceResult<T> {
@@ -182,6 +182,16 @@ export const signNowForFrontend = async (
 
 	try {
 		const signResult = await client.signNow(courseSchedId, timestamp);
+		const status = String(signResult?.STATUS ?? '');
+		if (status && status !== '0') {
+			return {
+				ok: false,
+				code: isSignParameterError(signResult) ? 'SIGN_PARAM_ERROR' : 'SIGN_REJECTED',
+				message: String(signResult?.ERRMSG ?? '签到失败'),
+				data: signResult
+			};
+		}
+
 		return {
 			ok: true,
 			code: 'OK',
